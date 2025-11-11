@@ -29,9 +29,14 @@ const VideoPlayer = ({ unique_id, isAdmin, socket }) => {
         isSyncingRef.current = true;
         setVideoSource(data.src); // Set state first
         setHasVideoSource(true); // Mark that video source is available
-        videoRef.current.src = data.src;
         
-        // Wait for video to be ready
+        // Handle video loading with error handling
+        const handleError = () => {
+          console.error('Error loading video:', data.src);
+          isSyncingRef.current = false;
+          alert('Error loading video. Please check if the video file is accessible.');
+        };
+        
         const handleCanPlay = () => {
           // Students have full control - don't auto-play or sync time/volume
           // Just load the video and let them control it
@@ -39,7 +44,9 @@ const VideoPlayer = ({ unique_id, isAdmin, socket }) => {
           console.log('Video loaded and ready for student');
         };
         
+        videoRef.current.addEventListener('error', handleError, { once: true });
         videoRef.current.addEventListener('canplay', handleCanPlay, { once: true });
+        videoRef.current.src = data.src;
         videoRef.current.load();
       }
     });
@@ -54,16 +61,23 @@ const VideoPlayer = ({ unique_id, isAdmin, socket }) => {
         isSyncingRef.current = true;
         setVideoSource(data.src); // Set state first to hide placeholder
         setHasVideoSource(true); // Mark that video source is available
-        videoRef.current.src = data.src;
         
-        // Students get the video source but have full independent control
+        // Handle video loading with error handling
+        const handleError = () => {
+          console.error('Error loading video:', data.src);
+          isSyncingRef.current = false;
+          alert('Error loading video. Please check if the video file is accessible.');
+        };
+        
         const handleCanPlay = () => {
           // Just load the video - students control play/pause/seek/volume themselves
           isSyncingRef.current = false;
           console.log('Video loaded and ready for student');
         };
         
+        videoRef.current.addEventListener('error', handleError, { once: true });
         videoRef.current.addEventListener('canplay', handleCanPlay, { once: true });
+        videoRef.current.src = data.src;
         videoRef.current.load();
       }
     });
