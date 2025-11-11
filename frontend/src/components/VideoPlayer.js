@@ -13,6 +13,8 @@ const VideoPlayer = ({ unique_id, isAdmin, socket }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [videoSource, setVideoSource] = useState('');
   const [hasVideoSource, setHasVideoSource] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const isSyncingRef = useRef(false);
 
   useEffect(() => {
@@ -218,47 +220,76 @@ const VideoPlayer = ({ unique_id, isAdmin, socket }) => {
     if (file && file.type.startsWith('video/')) {
       if (!isAdmin) return;
       
+      setIsUploading(true);
+      setUploadProgress(0);
+      
       try {
         // Upload video to server
         const formData = new FormData();
         formData.append('video', file);
         
-        const response = await fetch(API_ENDPOINTS.UPLOAD_VIDEO(unique_id), {
-          method: 'POST',
-          body: formData
+        const xhr = new XMLHttpRequest();
+        
+        // Track upload progress
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = (e.loaded / e.total) * 100;
+            setUploadProgress(percentComplete);
+          }
         });
         
-        const data = await response.json();
-        
-        if (data.success && videoRef.current) {
-          const videoUrl = data.videoUrl;
-          videoRef.current.src = videoUrl;
-          setVideoSource(videoUrl);
-          setHasVideoSource(true);
-          
-          if (socket) {
-            // Emit video source change with current state
-            socket.emit('video-source-change', {
-              unique_id,
-              src: videoUrl,
-              currentTime: videoRef.current.currentTime || 0,
-              volume: videoRef.current.volume || 1,
-              isPlaying: !videoRef.current.paused
-            });
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            const data = JSON.parse(xhr.responseText);
             
-            // Also update the stored state
-            socket.emit('video-state-update', {
-              unique_id,
-              src: videoUrl,
-              currentTime: videoRef.current.currentTime || 0,
-              volume: videoRef.current.volume || 1,
-              isPlaying: !videoRef.current.paused
-            });
+            if (data.success && videoRef.current) {
+              const videoUrl = data.videoUrl;
+              videoRef.current.src = videoUrl;
+              setVideoSource(videoUrl);
+              setHasVideoSource(true);
+              
+              if (socket) {
+                // Emit video source change with current state
+                socket.emit('video-source-change', {
+                  unique_id,
+                  src: videoUrl,
+                  currentTime: videoRef.current.currentTime || 0,
+                  volume: videoRef.current.volume || 1,
+                  isPlaying: !videoRef.current.paused
+                });
+                
+                // Also update the stored state
+                socket.emit('video-state-update', {
+                  unique_id,
+                  src: videoUrl,
+                  currentTime: videoRef.current.currentTime || 0,
+                  volume: videoRef.current.volume || 1,
+                  isPlaying: !videoRef.current.paused
+                });
+              }
+            }
+            setIsUploading(false);
+            setUploadProgress(0);
+          } else {
+            throw new Error('Upload failed');
           }
-        }
+        });
+        
+        xhr.addEventListener('error', () => {
+          console.error('Error uploading video');
+          alert('Failed to upload video. Please try again.');
+          setIsUploading(false);
+          setUploadProgress(0);
+        });
+        
+        xhr.open('POST', API_ENDPOINTS.UPLOAD_VIDEO(unique_id));
+        xhr.send(formData);
+        
       } catch (error) {
         console.error('Error uploading video:', error);
         alert('Failed to upload video. Please try again.');
+        setIsUploading(false);
+        setUploadProgress(0);
       }
     }
   };
@@ -290,6 +321,20 @@ const VideoPlayer = ({ unique_id, isAdmin, socket }) => {
       {!hasVideoSource && !isAdmin && (
         <div className="video-placeholder">
           <p>Waiting for admin to load a video...</p>
+        </div>
+      )}
+
+      {isUploading && (
+        <div className="upload-loader">
+          <div className="loader-spinner"></div>
+          <p className="upload-text">Uploading video...</p>
+          <div className="upload-progress-bar">
+            <div 
+              className="upload-progress-fill" 
+              style={{ width: `${uploadProgress}%` }}
+            ></div>
+          </div>
+          <p className="upload-percentage">{Math.round(uploadProgress)}%</p>
         </div>
       )}
 
@@ -359,8 +404,9 @@ const VideoPlayer = ({ unique_id, isAdmin, socket }) => {
             <button
               className="upload-btn"
               onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
             >
-              📁 Upload Video
+              {isUploading ? '⏳ Uploading...' : '📁 Upload Video'}
             </button>
             {videoSource && (
               <span className="video-source-info">Video loaded</span>
