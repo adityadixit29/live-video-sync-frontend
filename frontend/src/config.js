@@ -1,5 +1,5 @@
 // Backend API configuration
-export const API_BASE_URL = 'http://localhost:5000';
+export const API_BASE_URL = 'https://live-video-sync-backend.onrender.com';
 
 // API endpoints
 export const API_ENDPOINTS = {
