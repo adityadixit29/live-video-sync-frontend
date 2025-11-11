@@ -9,7 +9,6 @@ import './Session.css';
 const Session = () => {
   const { unique_id } = useParams();
   const navigate = useNavigate();
-  const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [sessionUrl, setSessionUrl] = useState('');
@@ -31,7 +30,6 @@ const Session = () => {
         
         if (response.data.success) {
           const sessionData = response.data.session;
-          setSession(sessionData);
           setSessionUrl(sessionData.userurl);
 
           // Determine if user is admin based on sessionStorage
